@@ -10,7 +10,7 @@ This packages provides the `processing` magic which can execute Processing Pytho
 To use the package, install this repo by pip.
 
 ```
-$ pip install https://github.com/yacchin1205/jupyter-processing-pymatplotlib.git
+$ pip install git+https://github.com/yacchin1205/jupyter-processing-pymatplotlib.git
 ```
 
 On your notebook, write and run the script below.
