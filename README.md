@@ -19,6 +19,12 @@ On your notebook, write and run the script below.
 %load_ext processingpymat
 ```
 
+Since the magic is shown as an interactive figure of matplotlib, you should use nbagg backend in the notebook.
+
+```
+%matplotlib nbagg
+```
+
 Then you can use `%%processing` magic on the notebook!
 
 ```
