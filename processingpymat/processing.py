@@ -8,8 +8,9 @@ from IPython.display import HTML
 
 class Processing:
 
-    def __init__(self, cell):
+    def __init__(self, cell, local_ns):
         self.cell = cell
+        self.local_ns = local_ns
 
     def plot(self, fig, ax, figsize=(500, 500), frames=60 * 60 * 30, framerate=60, skipframes=0, blit=True, debug=False):
         w, h = figsize
@@ -31,6 +32,7 @@ class Processing:
         gctx = DrawingContext(fig, ax, figsize=figsize)
         gctxproxy.base = gctx
         ctx = {}
+        ctx.update(self.local_ns)
         exec(self.cell, ctx)
         if 'setup' in ctx:
             ctx['setup']()
@@ -45,7 +47,8 @@ class Processing:
                     gctxproxy.base = None
                     startt = datetime.now()
                     gctxproxy.clear()
-                    ctx['draw']()
+                    if 'draw' in ctx:
+                        ctx['draw']()
                     gctxproxy.flush()
                     durt = (datetime.now() - startt) / timedelta(seconds=1)
                     if debug:
@@ -54,7 +57,8 @@ class Processing:
             gctxproxy.base = gctx
             startt = datetime.now()
             gctxproxy.clear()
-            ctx['draw']()
+            if 'draw' in ctx:
+                ctx['draw']()
             gctxproxy.flush()
             durt = (datetime.now() - startt) / timedelta(seconds=1)
             if debug:

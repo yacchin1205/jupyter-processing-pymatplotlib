@@ -1,4 +1,4 @@
-from IPython.core.magic import (Magics, magics_class, cell_magic, line_magic)
+from IPython.core.magic import (Magics, magics_class, cell_magic, line_magic, needs_local_scope)
 import matplotlib.pyplot as plt
 from .processing import Processing
 
@@ -14,11 +14,12 @@ class ProcessingPyMatplotlibMagics(Magics):
         return self._lastprocess
 
     @cell_magic
-    def processing(self, line, cell):
+    @needs_local_scope
+    def processing(self, line, cell, local_ns={}):
         args = dict([tuple(arg_) if len(arg_) == 2 else (arg_[0], True)
                      for arg_ in [arg.split('=') for arg in line.split()]])
 
-        self._lastprocess = Processing(cell)
+        self._lastprocess = Processing(cell, local_ns)
 
         fig = plt.figure()
         ax = fig.gca()
