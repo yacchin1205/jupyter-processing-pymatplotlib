@@ -185,6 +185,7 @@ class DrawingContext(DrawingContextBase):
         self.ax = ax
         self.width, self.height = figsize
         self.patches = PatchCache(ax)
+        self.texts = []
         self._antialiased = True
         self._fill = (1.0, 1.0, 1.0)
         self._stroke = (0.0, 0.0, 0.0)
@@ -222,7 +223,9 @@ class DrawingContext(DrawingContextBase):
         return args
 
     def background(self, *args):
-        [t.remove() for t in reversed(self.fig.texts)]
+        for t in self.texts:
+            t.remove()
+        self.texts = []
         self.ax.lines.clear()
         self.patches.clear()
         self.patches.add_rect(0, 0, self.width, self.height, {
@@ -315,10 +318,11 @@ class DrawingContext(DrawingContextBase):
 
     def text(self, *args):
         if len(args) == 3:
-            self.ax.text(args[1], args[2], args[0],
-                         color=self._fill,
-                         horizontalalignment=self._textAlignX,
-                         verticalalignment=self._textAlignY)
+            t = self.ax.text(args[1], args[2], args[0],
+                             color=self._fill,
+                             horizontalalignment=self._textAlignX,
+                             verticalalignment=self._textAlignY)
+            self.texts.append(t)
         else:
             assert False
 
