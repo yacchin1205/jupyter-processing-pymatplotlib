@@ -79,12 +79,12 @@ class Processing:
             fig.canvas.mpl_connect('key_release_event', keyReleased_)
 
         return animation.FuncAnimation(fig, step_animation,
-                                       frames=frames // (1 + skipframes),
+                                       frames=frames if hasattr(frames, '__call__') else (frames // (1 + skipframes)),
                                        interval=int(1000 / (framerate / (1 + skipframes))),
                                        blit=blit)
 
     def generate(self, skipframes=0, framerate=60, frames=100, blit=True, debug=False):
         fig = plt.figure()
         ax = fig.gca()
-        anim = self.plot(fig, ax, skipframes=skipframes, framerate=framerate , frames=frames, blit=blit, debug=debug)
+        anim = self.plot(fig, ax, skipframes=skipframes, framerate=framerate, frames=frames, blit=blit, debug=debug)
         return HTML(anim.to_html5_video())
