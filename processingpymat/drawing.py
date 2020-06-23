@@ -6,7 +6,6 @@ import matplotlib.patches as patches
 import matplotlib.lines as mlines
 import matplotlib.transforms as transforms
 import random as rand
-from .merge_rects import merge_rects
 
 
 def to_plt_color(args):
@@ -78,7 +77,7 @@ class PatchCache:
         self.updates = []
         self.cache = None
         self._background = None
-        self._buffer = []
+        self._buffer = None
 
     def begin(self):
         self.updates = []
@@ -95,51 +94,43 @@ class PatchCache:
         self.cache = self.patches
         self.patches = []
         self.updates = []
-        self._buffer = []
+        self._buffer = None
 
     def flush_buffer(self):
-        last_buffer = self._buffer
-        self._add_buffer_as_patch(last_buffer)
-        self._buffer = []
+        self._add_buffer_as_patch(self._buffer)
+        self._buffer = None
 
     def add_rect(self, x, y, w, h, kwargs):
         if not self._should_push_buffer(x, y, w, h, kwargs):
             self.flush_buffer()
-        self._buffer.append((x, y, w, h, kwargs))
+        if self._buffer is None:
+            self._buffer = (x, y, w, h, kwargs)
+            return
+        x0, y0, w0, h0, kwargs0 = self._buffer
+        if x0 == x and w0 == w:
+            self._buffer = (x, min(y, y0), w, max(y + h, y0 + h0) - min(y, y0), kwargs)
+        if y0 == y and h0 == h:
+            self._buffer = (min(x, x0), y, max(x + w, x0 + w0) - min(x, x0), h, kwargs)
 
     def _should_push_buffer(self, x, y, w, h, kwargs):
-        if len(self._buffer) == 0:
+        if self._buffer is None:
             return True
+        x0, y0, w0, h0, kwargs0 = self._buffer
+        if kwargs0 != kwargs:
+            return False
         if 'linewidth' in kwargs and kwargs['linewidth'] is not None and kwargs['linewidth'] > 0:
             return False
-        cx = x + w / 2
-        cy = y + h / 2
-        for x0, y0, w0, h0, kwargs0 in self._buffer:
-            if kwargs0 != kwargs:
-                return False
-            # intersects?
-            cx0 = x0 + w0 / 2
-            cy0 = y0 + h0 / 2
-            if abs(cx0 - cx) <= w / 2 + w0 / 2 and abs(cy0 - cy) <= h / 2 + h0 / 2:
-                return True
+        if x0 == x and w0 == w and (y + h == y0 or y0 + h0 == y):
+            return True
+        if y0 == y and h0 == h and (x + w == x0 or x0 + w0 == x):
+            return True
         return False
 
     def _add_buffer_as_patch(self, buffer):
-        if len(buffer) == 0:
+        if buffer is None:
             return
-        if len(buffer) == 1:
-            x, y, w, h, kwargs = buffer[0]
-            self._add_rect(x, y, w, h, kwargs)
-            return
-        x, y, w, h, kwargs = buffer[0]
-        rects = [[[x, y], [x + w, y + h]] for x, y, w, h, _ in buffer]
-        for p in merge_rects(rects):
-            if self._is_rect(p):
-                xs = [e[0] for e in p]
-                ys = [e[1] for e in p]
-                self._add_rect(min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys), kwargs)
-            else:
-                self._add_polygon(p, True, kwargs)
+        x, y, w, h, kwargs = buffer
+        self._add_rect(x, y, w, h, kwargs)
 
     def _is_rect(self, points):
         if len(points) != 4:
