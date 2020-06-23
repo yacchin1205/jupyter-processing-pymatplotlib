@@ -6,6 +6,7 @@ import matplotlib.patches as patches
 import matplotlib.lines as mlines
 import matplotlib.transforms as transforms
 import random as rand
+from .merge_rects import merge_rects
 
 
 def to_plt_color(args):
@@ -77,11 +78,13 @@ class PatchCache:
         self.updates = []
         self.cache = None
         self._background = None
+        self._buffer = []
 
     def begin(self):
         self.updates = []
 
     def flush(self):
+        self.flush_buffer()
         if self.cache is None:
             return
         remainps = [cp for _, cp in self.cache]
@@ -92,8 +95,62 @@ class PatchCache:
         self.cache = self.patches
         self.patches = []
         self.updates = []
+        self._buffer = []
+
+    def flush_buffer(self):
+        last_buffer = self._buffer
+        self._add_buffer_as_patch(last_buffer)
+        self._buffer = []
 
     def add_rect(self, x, y, w, h, kwargs):
+        if not self._should_push_buffer(x, y, w, h, kwargs):
+            self.flush_buffer()
+        self._buffer.append((x, y, w, h, kwargs))
+
+    def _should_push_buffer(self, x, y, w, h, kwargs):
+        if len(self._buffer) == 0:
+            return True
+        if 'linewidth' in kwargs and kwargs['linewidth'] is not None and kwargs['linewidth'] > 0:
+            return False
+        cx = x + w / 2
+        cy = y + h / 2
+        for x0, y0, w0, h0, kwargs0 in self._buffer:
+            if kwargs0 != kwargs:
+                return False
+            # intersects?
+            cx0 = x0 + w0 / 2
+            cy0 = y0 + h0 / 2
+            if abs(cx0 - cx) <= w / 2 + w0 / 2 and abs(cy0 - cy) <= h / 2 + h0 / 2:
+                return True
+        return False
+
+    def _add_buffer_as_patch(self, buffer):
+        if len(buffer) == 0:
+            return
+        if len(buffer) == 1:
+            x, y, w, h, kwargs = buffer[0]
+            self._add_rect(x, y, w, h, kwargs)
+            return
+        x, y, w, h, kwargs = buffer[0]
+        rects = [[[x, y], [x + w, y + h]] for x, y, w, h, _ in buffer]
+        for p in merge_rects(rects):
+            if self._is_rect(p):
+                xs = [e[0] for e in p]
+                ys = [e[1] for e in p]
+                self._add_rect(min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys), kwargs)
+            else:
+                self._add_polygon(p, True, kwargs)
+
+    def _is_rect(self, points):
+        if len(points) != 4:
+            return False
+        p = points + points[:1]
+        for p1, p2 in zip(p, p[1:]):
+            if p1[0] != p2[0] and p1[1] != p2[1]:
+                return False
+        return True
+
+    def _add_rect(self, x, y, w, h, kwargs):
         cached = self._get_cache('rect')
         if cached is not None:
             changed = False
@@ -119,6 +176,7 @@ class PatchCache:
         self.patches.append(('rect', p))
 
     def add_ellipse(self, x, y, w, h, kwargs):
+        self.flush_buffer()
         cached = self._get_cache('ellipse{},{}'.format(w, h))
         if cached is not None:
             cached.set_center((x, y))
@@ -131,6 +189,10 @@ class PatchCache:
         self.updates.append(p)
 
     def add_polygon(self, xy, closed, kwargs):
+        self.flush_buffer()
+        self._add_polygon(xy, closed, kwargs)
+
+    def _add_polygon(self, xy, closed, kwargs):
         cached = self._get_cache('polygon')
         if cached is not None:
             cached.set_xy(xy)
@@ -259,6 +321,7 @@ class DrawingContext(DrawingContextBase):
         self.patches.add_ellipse(x, y, w, h, self._to_patch_args())
 
     def line(self, x1, y1, x2, y2):
+        self.patches.flush_buffer()
         line = mlines.Line2D([x1, x2], [y1, y2], **self._to_patch_args(line=True))
         self.ax.add_line(line)
 
@@ -286,19 +349,23 @@ class DrawingContext(DrawingContextBase):
         self.height = height
 
     def pushMatrix(self):
+        self.patches.flush_buffer()
         self._transforms.append(self._currentTransform)
         if self._currentTransform is not None:
             trans, rotate = self._currentTransform
             self._currentTransform = (transforms.Affine2D(trans.get_matrix()), transforms.Affine2D(rotate.get_matrix()))
 
     def popMatrix(self):
+        self.patches.flush_buffer()
         self._currentTransform = self._transforms.pop()
 
     def translate(self, dx, dy):
+        self.patches.flush_buffer()
         trans, rotate = self._getTransform()
         trans.translate(dx, dy)
 
     def rotate(self, theta):
+        self.patches.flush_buffer()
         trans, rotate = self._getTransform()
         rotate.rotate(theta)
 
@@ -317,6 +384,7 @@ class DrawingContext(DrawingContextBase):
         self._textAlignY = 'baseline' if alignY is None else valign[alignY]
 
     def text(self, *args):
+        self.patches.flush_buffer()
         if len(args) == 3:
             t = self.ax.text(args[1], args[2], args[0],
                              color=self._fill,
