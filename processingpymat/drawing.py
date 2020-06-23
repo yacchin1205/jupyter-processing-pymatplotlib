@@ -273,6 +273,8 @@ class DrawingContext(DrawingContextBase):
         if self._currentTransform is not None:
             trans, rotate = self._currentTransform
             args['transform'] = rotate + trans + self.ax.transData
+        else:
+            args['transform'] = self.ax.transData
         return args
 
     def background(self, *args):
