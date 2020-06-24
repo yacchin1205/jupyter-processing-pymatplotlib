@@ -12,7 +12,9 @@ class Processing:
         self.cell = cell
         self.local_ns = local_ns
 
-    def plot(self, fig, ax, figsize=(500, 500), frames=60 * 60 * 30, framerate=60, skipframes=0, blit=True, debug=False):
+    def plot(self, fig, ax, figsize=(500, 500), frames=60 * 60 * 30,
+             framerate=60, skipframes=0, blit=True, save_count=None,
+             debug=False):
         w, h = figsize
         ax.set_xlim(0, w)
         ax.set_ylim(0, h)
@@ -81,10 +83,14 @@ class Processing:
         return animation.FuncAnimation(fig, step_animation,
                                        frames=frames if hasattr(frames, '__call__') else (frames // (1 + skipframes)),
                                        interval=int(1000 / (framerate / (1 + skipframes))),
+                                       save_count=save_count,
                                        blit=blit)
 
-    def generate(self, skipframes=0, framerate=60, frames=100, blit=True, debug=False):
+    def generate(self, skipframes=0, framerate=60, frames=100, blit=True,
+                 save_count=None, debug=False):
         fig = plt.figure()
         ax = fig.gca()
-        anim = self.plot(fig, ax, skipframes=skipframes, framerate=framerate, frames=frames, blit=blit, debug=debug)
+        anim = self.plot(fig, ax, skipframes=skipframes, framerate=framerate,
+                         frames=frames, blit=blit, save_count=save_count,
+                         debug=debug)
         return HTML(anim.to_html5_video())
